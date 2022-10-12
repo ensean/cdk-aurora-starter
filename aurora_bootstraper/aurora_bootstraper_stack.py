@@ -14,7 +14,8 @@ from aws_cdk import (
   aws_sns_subscriptions as subs,
   aws_lambda            as lfn,
   Aspects, CfnOutput, Stack, SecretValue, Tags, Fn, Aws, CfnMapping, Duration, RemovalPolicy,
-  App, RemovalPolicy
+  App, RemovalPolicy,
+  CfnParameter
 )
 
 from constructs import Construct
@@ -22,17 +23,16 @@ from constructs import Construct
 import re
 import os
 
-from cdk_nag import ( AwsSolutionsChecks, NagSuppressions )
 
 class Aurora(Stack):
 
   def __init__(self, scope:Construct, id:str,
-                vpc_id:str,                 ## vpc id
-                subnet_ids:list,            ## list of subnet ids
-                db_name:str,                ## database name
-                instance_type = None,       ## ec2.InstanceType
-                replica_instances:int = 2,  ## At least 1. Default 1
-                aurora_cluster_username:str="admin",
+                vpc_id:str = "",                      ## vpc id
+                subnet_ids:list = [],                 ## list of subnet ids
+                db_name:str = "",                     ## database name
+                instance_type = None,                 ## ec2.InstanceType
+                replica_instances:int = 2,            ## At least 1. Default 1
+                aurora_cluster_username:str="admin",  ## default master account name
                 backup_retention_days:int=14,
                 backup_window:str="00:15-01:15",
                 preferred_maintenance_window:str="Sun:23:45-Mon:00:15",
@@ -42,7 +42,10 @@ class Aurora(Stack):
                                             ##   ec2.SecurityGroup
                 **kwargs) -> None:
     super().__init__(scope, id, **kwargs)
-
+    
+    param_db_name = CfnParameter(self, "db_name", type="String",
+    description="The name of the Amazon S3 bucket where uploaded files will be stored.")
+    db_name = param_db_name.value_as_string
 
     if engine not in ["postgresql", "mysql"]:
       print("Unknown Engine")
@@ -176,7 +179,6 @@ class Aurora(Stack):
         removal_policy=RemovalPolicy.SNAPSHOT,
         copy_tags_to_snapshot=True,
         cloudwatch_logs_exports=cloudwatch_logs_exports,
-        cloudwatch_logs_retention=logs.RetentionDays.ONE_MONTH,
         preferred_maintenance_window=preferred_maintenance_window, # Should be specified as a range ddd:hh24:mi-ddd:hh24:mi (24H Clock UTC).
                                                                    # Example: Sun:23:45-Mon:00:15
                                                                    # Default: 30-minute window selected at random from an 8-hour block of time for each AWS Region, 
